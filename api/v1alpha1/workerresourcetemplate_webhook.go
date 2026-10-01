@@ -414,7 +414,7 @@ func checkMetricSelectorLabelsNotSet(spec map[string]interface{}, path *field.Pa
 	for i, m := range metrics {
 		entry, ok := m.(map[string]interface{})
 		if !ok {
-			return
+			continue
 		}
 		ext, ok := entry["external"].(map[string]interface{})
 		if !ok {
@@ -433,7 +433,7 @@ func checkMetricSelectorLabelsNotSet(spec map[string]interface{}, path *field.Pa
 			continue // absent or {} — both valid
 		}
 		ownedKeys := ControllerOwnedMetricLabelKeys
-		if !stripTemporalPrefix {
+		if stripTemporalPrefix {
 			ownedKeys = append(ownedKeys,
 				"worker_deployment_name",
 				"worker_build_id",
@@ -443,7 +443,7 @@ func checkMetricSelectorLabelsNotSet(spec map[string]interface{}, path *field.Pa
 		for _, key := range ownedKeys {
 			if _, exists := ml[key]; exists {
 				*allErrs = append(*allErrs, field.Forbidden(
-					metricsPath.Index(i).Child("metric").Child("selector").Child("matchLabels").Key(key),
+					metricsPath.Index(i).Child("external").Child("metric").Child("selector").Child("matchLabels").Key(key),
 					fmt.Sprintf("label %q is managed by the controller; do not set it manually — "+
 						"the controller appends temporal_worker_deployment_name, temporal_worker_build_id, and temporal_namespace "+
 						"to any matchLabels present (including {})", key),
