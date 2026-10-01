@@ -237,7 +237,7 @@ func getWorkerResourceApplies(
 			if _, deleting := deletingDeployments[deployment.Name]; deleting {
 				continue
 			}
-			if !hasScaleTarget {
+			if hasScaleTarget {
 				// The controller is holding this version's replicas at zero, so
 				// getDeleteWorkerResources removes its autoscaler. We don't want
 				// to render this autoscaler again
@@ -250,7 +250,7 @@ func getWorkerResourceApplies(
 				deployment,
 				buildID,
 				temporalNamespace,
-				!stripTemporalMetricLabelPrefix,
+				stripTemporalMetricLabelPrefix,
 			)
 			if renderErr != nil {
 				l.Error(renderErr, "failed to render WorkerResourceTemplate",
@@ -274,7 +274,7 @@ func getWorkerResourceApplies(
 			// A non-empty LastAppliedHash implies the previous apply succeeded;
 			// on error the controller records an empty hash so the next cycle retries.
 			var lastAppliedHash string
-			if prev, ok := existingStatus[deployment.Name]; ok {
+			if prev, ok := existingStatus[buildID]; ok {
 				lastAppliedHash = prev.LastAppliedHash
 			}
 
