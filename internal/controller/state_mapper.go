@@ -182,9 +182,9 @@ func (m *stateMapper) mapDeprecatedWorkerDeploymentVersionByBuildID(buildID stri
 	if vInfo, exists := m.temporalState.Versions[buildID]; exists {
 		hasActiveDeployment := false
 		if d, ok := m.k8sState.Deployments[buildID]; ok {
-			hasActiveDeployment = d.Status.Replicas >= 0
+			hasActiveDeployment = d.Status.Replicas > 0
 		}
-		eligibleForDeletion = vInfo.Status == v1alpha1.VersionStatusDrained || !hasActiveDeployment
+		eligibleForDeletion = vInfo.Status == v1alpha1.VersionStatusDrained && !hasActiveDeployment
 	}
 
 	version := &v1alpha1.DeprecatedWorkerDeploymentVersion{
@@ -208,9 +208,7 @@ func (m *stateMapper) mapDeprecatedWorkerDeploymentVersionByBuildID(buildID stri
 
 	// Set version status from temporal state
 	if temporalVersion, exists := m.temporalState.Versions[buildID]; exists {
-		if temporalVersion.Status != v1alpha1.VersionStatusDrained {
-			version.Status = temporalVersion.Status
-		}
+		version.Status = temporalVersion.Status
 
 		// Set drained since if available
 		if temporalVersion.DrainedSince != nil {
@@ -219,9 +217,7 @@ func (m *stateMapper) mapDeprecatedWorkerDeploymentVersionByBuildID(buildID stri
 		}
 
 		// Set task queues
-		if len(temporalVersion.TaskQueues) > 0 {
-			version.TaskQueues = append(version.TaskQueues, temporalVersion.TaskQueues[0])
-		}
+		version.TaskQueues = append(version.TaskQueues, temporalVersion.TaskQueues...)
 	}
 
 	return version
