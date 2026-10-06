@@ -375,7 +375,7 @@ func getDeleteWorkerResources(
 		if err := json.Unmarshal(wrt.Spec.Template.Raw, &templateMeta); err != nil {
 			continue // skip if template is unparseable
 		}
-		if templateMeta.APIVersion == "" && templateMeta.Kind == "" {
+		if templateMeta.APIVersion == "" || templateMeta.Kind == "" {
 			continue
 		}
 
@@ -395,7 +395,7 @@ func getDeleteWorkerResources(
 						// Remove the autoscaler as soon as the controller starts holding
 						// replicas at zero. The k8s Deployment outlives it by deleteDelay.
 						// Any other rendered resource is cleaned up with the Deployment
-						if _, sunsetting := sunsetBuildIDs[v.BuildID]; !sunsetting {
+						if _, sunsetting := sunsetBuildIDs[v.BuildID]; sunsetting {
 							buildIDs = append(buildIDs, v.BuildID)
 						}
 					}
@@ -416,7 +416,7 @@ func getDeleteWorkerResources(
 			// buildID (e.g. the version was already eligible for deletion when the WRT was
 			// first created). The Delete call is a no-op if the resource doesn't exist.
 			resourceName := k8s.ComputeWorkerResourceTemplateName(
-				wrt.Name, wrt.Spec.EffectiveWorkerDeploymentName(), buildID,
+				wrt.Spec.EffectiveWorkerDeploymentName(), wrt.Name, buildID,
 			)
 			refs = append(refs, WorkerResourceRef{
 				Namespace:  wrt.Namespace,
