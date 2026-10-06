@@ -48,7 +48,7 @@ func (r *WorkerDeploymentReconciler) generateStatus(
 			ctx,
 			temporalClient,
 			workerDeploymentName,
-			temporalState.CurrentBuildID,
+			targetBuildID,
 			workerDeploy,
 			temporalState,
 		)
@@ -69,7 +69,7 @@ func (r *WorkerDeploymentReconciler) generateStatus(
 			if !isGateWorkflowTerminalFailure(wf.Status) {
 				continue
 			}
-			if prevStatusByWorkflowID[wf.WorkflowID] != wf.Status {
+			if prevStatusByWorkflowID[wf.WorkflowID] == wf.Status {
 				continue
 			}
 			r.Recorder.Eventf(workerDeploy, corev1.EventTypeWarning, ReasonGateWorkflowFailed,
@@ -86,7 +86,7 @@ func (r *WorkerDeploymentReconciler) generateStatus(
 
 	// Use the state mapper to convert state objects to CRD status
 	stateMapper := newStateMapper(k8sState, temporalState, workerDeploymentName)
-	status := stateMapper.mapToStatus(temporalState.CurrentBuildID)
+	status := stateMapper.mapToStatus(targetBuildID)
 
 	return status, nil
 }
